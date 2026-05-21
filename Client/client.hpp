@@ -2,13 +2,18 @@
 #include "EnetworkTypes/MessagType.hpp"
 #include <string>
 #include <memory>
+#include <filesystem>
+#include <fstream>
+#include <unordered_map>
 
-class Client
+class Client : std::enable_shared_from_this<Client>
 {
     private:
 
     boost::asio::ip::tcp::socket connectserver;
-   
+    uint32_t idsendfile = 0;
+    void error(std::string&& er);
+    std::unordered_map<int32_t,ActiveFileInfo> Allfile;
 
     public:
 

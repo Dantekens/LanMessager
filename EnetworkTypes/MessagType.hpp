@@ -5,7 +5,14 @@
 enum class Type : uint8_t
 {
     Text,
-    File
+    FileNow,
+    FileNext
+};
+
+struct ActiveFileInfo
+{
+    std::shared_ptr<std::ofstream> file;
+    int64_t bytefile = 0;
 };
 
 #pragma pack(push,1)
@@ -15,9 +22,10 @@ struct DataSize
     uint8_t type;
     int32_t nameFile;
     int64_t data;
-    DataSize(Type typemessag,int32_t namefile,int64_t data) : type(static_cast<uint8_t>(typemessag)), nameFile(namefile), data(data){}
-    DataSize(uint8_t typemessag,int32_t namefile,int64_t data) : type(typemessag), nameFile(namefile), data(data){}
-    DataSize() : type(0), nameFile(0), data(0){}
+    uint32_t idFile = 0;
+    DataSize(Type typemessag, int32_t namefile, int64_t data, int32_t idfile) : type(static_cast<uint8_t>(typemessag)), nameFile(namefile), data(data), idFile(idfile) {}
+    DataSize(uint8_t typemessag, int32_t namefile, int64_t data, int32_t idfile) : type(typemessag), nameFile(namefile), data(data), idFile(idfile) {}
+    DataSize() : type(0), nameFile(0), data(0), idFile(0) {}
 };
 
 #pragma pack(pop)
