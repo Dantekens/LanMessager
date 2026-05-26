@@ -19,17 +19,19 @@ class Server
     std::unordered_map<int32_t,std::shared_ptr<Session>> users;
     static int32_t id;
     boost::asio::io_context& io;
+    boost::asio::ip::tcp::acceptor acceptor;
 
 
     void addUsers();
 
 
-    void sendFileAllUsers(std::string& filename);
-    void sendTextAllUsers(std::shared_ptr<std::string> text);
+    void sendFileAllUsers(std::string& file_path,int this_id_user);
+    void sendTextAllUsers(const std::string& text,int this_id_user);
+    
+    void sendFileIdUser(std::string& path,int id_user);
+    void sendTextIdUser(const std::string& text,int id_user);
 
-    void sendFileIdUser(std::string& filename);
-    void sendTextIdUser(std::shared_ptr<std::string> text);
-
+    void DisconectUser(int id);
     public:
 
     Server(boost::asio::io_context& io, unsigned short port);

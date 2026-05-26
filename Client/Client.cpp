@@ -4,10 +4,10 @@
 
 
 
-    Client::Client(boost::asio::io_context& io): connectserver(io)
-    {
+Client::Client(boost::asio::io_context& io): connectserver(io)
+{
         check_path_file_save();
-    }
+}
 
     void Client::check_path_file_save()
     {

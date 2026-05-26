@@ -6,7 +6,8 @@ enum class Type : uint8_t
 {
     Text,
     FileNow,
-    FileNext
+    FileNext,
+    Login
 };
 
 struct ActiveFileInfo
