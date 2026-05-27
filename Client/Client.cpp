@@ -66,19 +66,20 @@ Client::Client(boost::asio::io_context& io): connectserver(io)
                 error("сервер отключен");
                 return;
             }
+            reverse_read();
         });
     }
     void Client::error(std::string&& er)
     {
         std::cout << "ВНИМАНИЕ" + er << std::endl;
     }
-    void Client::send_text(std::string& text)
+    void Client::send_text(std::string text)
     {
-
+        auto self = shared_from_this();
         auto data = std::make_shared<DataSize>(Type::Text,0,text.size(),0);
         auto textHeap = std::make_shared<std::string>(std::move(text));
 
-        boost::asio::async_write(connectserver,boost::asio::buffer(data.get(),sizeof(*data)),[this,data,textHeap](const boost::system::error_code& er,std::size_t size)
+        boost::asio::async_write(connectserver,boost::asio::buffer(data.get(),sizeof(*data)),[this,self,data,textHeap](const boost::system::error_code& er,std::size_t size)
         {
             if(er)
             {
@@ -86,7 +87,7 @@ Client::Client(boost::asio::io_context& io): connectserver(io)
                 return;
             }
 
-            boost::asio::async_write(connectserver,boost::asio::buffer(*textHeap),[this,textHeap](const boost::system::error_code& er,std::size_t size)
+            boost::asio::async_write(connectserver,boost::asio::buffer(*textHeap),[this,self,textHeap](const boost::system::error_code& er,std::size_t size)
             {
                 if(er)
                 {
@@ -109,10 +110,10 @@ Client::Client(boost::asio::io_context& io): connectserver(io)
          
         int64_t sizefile = static_cast<int64_t>(std::filesystem::file_size(path_file));
 
-        std::string filename = path_file.filename().string(); 
-        auto data = std::make_shared<DataSize>(Type::FileNow,filename.size(),sizefile,idsendfile);
+        auto filename = std::make_shared<std::string>(path_file.filename().string()); 
+        auto data = std::make_shared<DataSize>(Type::FileNow,filename->size(),sizefile,idsendfile);
         auto self = shared_from_this();
-        auto fileread = std::make_shared<std::ifstream>(path,std::ios::binary);
+        auto fileread = std::make_shared<std::ifstream>(path.c_str(),std::ios::binary);
 
         ++idsendfile;
         boost::asio::async_write(connectserver,boost::asio::buffer(data.get(),sizeof(*data)),[this,filename,self,data,fileread](const boost::system::error_code& code,std::size_t size)
@@ -123,7 +124,7 @@ Client::Client(boost::asio::io_context& io): connectserver(io)
                 return;
             }
 
-            boost::asio::async_write(connectserver,boost::asio::buffer(filename),[this,filename,data, self,fileread](const boost::system::error_code& code,std::size_t size)
+            boost::asio::async_write(connectserver,boost::asio::buffer(*filename),[this,filename,data, self,fileread](const boost::system::error_code& code,std::size_t size)
             {
                 if(code)
                 {
@@ -164,7 +165,11 @@ Client::Client(boost::asio::io_context& io): connectserver(io)
                         
                     }
                     else
-                       error("Фаил успешно отправлен");
+                    {
+                        error("Фаил успешно отправлен");
+                            
+                    }
+                       
                     
                 };
 
@@ -209,7 +214,7 @@ Client::Client(boost::asio::io_context& io): connectserver(io)
         auto namefile = std::make_shared<std::string>();
         namefile->resize(size_name);
         auto self = shared_from_this();
-        boost::asio::async_read(connectserver,boost::asio::buffer(namefile.get(),size_name),[this,self,namefile,data,id](const boost::system::error_code& er, std::size_t size)
+        boost::asio::async_read(connectserver,boost::asio::buffer(namefile->data(),size_name),[this,self,namefile,data,id](const boost::system::error_code& er, std::size_t size)
         {
             if(er)
             {
@@ -229,6 +234,7 @@ Client::Client(boost::asio::io_context& io): connectserver(io)
                 return;
             }
             Allfile[id] = info;
+             reverse_read();
         });
 
     }
@@ -249,16 +255,23 @@ Client::Client(boost::asio::io_context& io): connectserver(io)
                  error("соединение разорвано");
                 return;
             }
-            auto& find_file = Allfile[id];
-            find_file.file->write(buffers->data(),size);
-            find_file.bytefile -= size;
-            if(find_file.bytefile == 0)
-            {
-                find_file.file->close();
-                Allfile.erase(id);
 
-                std::cout << "фаил успешно отправлен" << std::endl;
+            auto it = Allfile.find(id);
+            if(it != Allfile.end() && it->second.file->is_open())
+            {
+                auto& find_file = it->second;
+                find_file.file->write(buffers->data(),size);
+                find_file.bytefile -= static_cast<int64_t>(size);
+                if(find_file.bytefile <= 0)
+                {
+                    find_file.file->close();
+                    Allfile.erase(id);
+
+                    std::cout << "фаил успешно принят" << std::endl;
+                }
             }
+
+            
             reverse_read();
 
         });

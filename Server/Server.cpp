@@ -21,7 +21,7 @@ void Server::addUsers()
 }
 
 
-void Server::sendFileAllUsers(std::string& file_path,int this_id_user)
+void Server::sendFileAllUsers(std::filesystem::path file_path,int32_t this_id_user)
 {
     for(auto& [user_id,user] : users)
     {
@@ -30,7 +30,7 @@ void Server::sendFileAllUsers(std::string& file_path,int this_id_user)
     }
 
 }
-void Server::sendTextAllUsers(const std::string& text,int this_id_user)
+void Server::sendTextAllUsers(const std::string& text,int32_t this_id_user)
 {
     for(auto& [user_id,user] : users)
     {
@@ -40,35 +40,93 @@ void Server::sendTextAllUsers(const std::string& text,int this_id_user)
 }
 
 
-void Server::sendFileIdUser(std::string& path,int id_user)
+void Server::sendFileIdUser(std::string& path,int32_t id_user)
 {
-    for(auto& [user_id,user] : users)
+    auto it = users.find(id_user);
+    if(it != users.end())
     {
-        if(user_id == id_user) user->sendFile(path);;
+        it->second->sendFile(path);
     }
-
 }
-void Server::sendTextIdUser(const std::string& text,int id_user)
+void Server::sendTextIdUser(const std::string& text,int32_t id_user)
 {
-    for(auto& [user_id,user] : users)
+     auto it = users.find(id_user);
+    if(it != users.end())
     {
-        if(user_id == id_user) user->sendText(text);;
+        it->second->sendText(text);
     }
 }
 
   
-void Server::DisconectUser(int id)
+void Server::DisconectUser(int32_t id)
 {
-    auto& user = users[id];
-    user->CloseSocket();
-    users.erase(id);
-    
+
+    auto it = users.find(id);
+    if(it != users.end())
+    {
+        it->second->CloseSocket();
+        boost::asio::post(io,[this,id]()
+        {
+            users.erase(id);
+        });
+    }
 }
 
 Server::Server(boost::asio::io_context& io, unsigned short port) : io(io), acceptor(boost::asio::ip::tcp::acceptor(io,boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(),port)))
 {
+    id = 1;
+    check_path_file_save();
+    
     addUsers();
 }
+
+ void Server::check_path_file_save()
+    {
+
+       std::string filepath;
+
+       while(true)
+       {
+            std::cout << "Введите путь для сохранения фалов "<<std::endl;
+            std::getline(std::cin,filepath);
+            path_to_save_file = filepath;
+            if(!std::filesystem::exists(filepath))
+            {
+                    char exis;
+                    std::error_code err;
+                ReadError("такого пути нет  хотите создать директорию по данному пути y/n");
+                    std::cin >> exis;
+                     std::cin.ignore(std::numeric_limits<std::streamsize>::max(),'\n');
+                    if(exis == 'y'|| exis == 'Y')
+                    {
+                        std::filesystem::create_directories(path_to_save_file,err);
+                        if(err)
+                        {
+                            ReadError("ошибка"+err.message());
+                            continue;
+                        } 
+                        break;
+                    }
+                    else
+                    continue;
+                    
+            }
+            else
+            {
+                if(std::filesystem::is_directory(path_to_save_file))
+                {
+                    std::cout << "Все успкшно создано можете  начинать общение "<<std::endl;
+                    break;
+                }
+                    
+                else
+                {
+                    ReadError("это не папка  укажите путь еще раз");
+                   continue;
+                }
+            }
+       }                     
+    }
 void Server::ReadError(std::string&& texterror)
 {
     std::cout << "Внимание "+ texterror << std::endl;

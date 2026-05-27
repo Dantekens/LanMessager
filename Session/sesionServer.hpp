@@ -5,17 +5,24 @@
 #include <string>
 #include <vector>
 #include "EnetworkTypes/MessagType.hpp"
+#include <unordered_map>
+#include <filesystem>
+#include <fstream>
+#include <algorithm>
+
 
 class Server;
 
 class Session : public std::enable_shared_from_this<Session>
 {
     private:
+    std::unordered_map<int32_t,ActiveFileInfo> files;
 
     std::string login;
     boost::asio::ip::tcp::socket socketClient;
     Server& server;
     int32_t id;
+
 
     
     void readMessag();
@@ -29,7 +36,7 @@ class Session : public std::enable_shared_from_this<Session>
     void CloseSocket();
     void start();
     Session(boost::asio::ip::tcp::socket&& socket,Server& server,int32_t id);
-    void sendFile(std::string& path);
-    void sendText(std::string&  text);
+    void sendFile(std::filesystem::path path_file);
+    void sendText(const std::string text);
 
 };

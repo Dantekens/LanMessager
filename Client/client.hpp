@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <fstream>
 #include <unordered_map>
+#include <algorithm>
 
 class Client : std::enable_shared_from_this<Client>
 {
@@ -24,7 +25,7 @@ class Client : std::enable_shared_from_this<Client>
     Client(boost::asio::io_context& io);
 
     void connect(boost::asio::ip::address addressServet,unsigned short portserver);
-    void send_text(std::string& text);
+    void send_text(std::string text);
     void send_file(std::string&& path);
 
     void reverse_read();
