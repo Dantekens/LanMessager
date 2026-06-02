@@ -6,6 +6,11 @@
 #include <fstream>
 #include <unordered_map>
 #include <algorithm>
+#include <queue>
+#include <mutex>
+
+
+inline std::mutex loger;
 
 class Client : std::enable_shared_from_this<Client>
 {
@@ -13,20 +18,24 @@ class Client : std::enable_shared_from_this<Client>
     
     boost::asio::ip::tcp::socket connectserver;
     uint32_t idsendfile = 0;
+    bool seding = false;
 
     std::unordered_map<int32_t,ActiveFileInfo> Allfile;
     std::filesystem::path path_to_save_file;
+    std::queue<std::shared_ptr<Packet>> packet;
 
     void check_path_file_save();
     void error(std::string&& er);
+    void send_packet();
+    void add_packet_in_queue(std::shared_ptr<Packet> packet);
 
     public:
 
     Client(boost::asio::io_context& io);
 
     void connect(boost::asio::ip::address addressServet,unsigned short portserver);
-    void send_text(std::string text);
-    void send_file(std::string&& path);
+    void forming_package_text(std::string text);
+    void forming_package_send_file(std::string&& path);
 
     void reverse_read();
     void read_file_now(uint32_t size_name,uint64_t data,uint32_t id);

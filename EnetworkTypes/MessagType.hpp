@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <fstream>
 #include <filesystem>
+#include <string>
 
 
 enum class Type : uint8_t
@@ -19,6 +20,7 @@ struct ActiveFileInfo
     std::filesystem::path path_to_file;
 };
 
+
 #pragma pack(push,1)
 
 struct DataSize
@@ -34,3 +36,14 @@ struct DataSize
 };
 
 #pragma pack(pop)
+
+struct Packet
+{
+    DataSize data;
+    std::vector<char> str; 
+    std::shared_ptr<std::ifstream> stream_file = nullptr;
+
+    Packet(DataSize data,std::vector<char> str) : data(data), str(std::move(str)){}
+    Packet(DataSize data,std::string str) : data(data), str(str.begin(),str.end()){}
+    Packet(DataSize data,std::vector<char> str,std::shared_ptr<std::ifstream> stream_file) : data(data), str(std::move(str)),stream_file(stream_file){}
+};
