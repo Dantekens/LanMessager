@@ -1,13 +1,14 @@
 #include "server.hpp"
 #include <iostream>
 
+
 void Server::addUsers()
 {
-    acceptor.async_accept([this](const boost::system::error_code& er,boost::asio::ip::tcp::socket socket)
+    acceptor.async_accept(boost::asio::make_strand(io),[this](const boost::system::error_code& er,boost::asio::ip::tcp::socket socket)
     {
         if(!er)
         {
-            auto user = std::make_shared<Session>(std::move(socket),this,id);
+            auto user = std::make_shared<Session>(std::move(socket),io,*this,id);
             users[id] = user;
             user->start();
             ++id;
@@ -20,44 +21,44 @@ void Server::addUsers()
     });
 }
 
-
-void Server::sendFileAllUsers(std::filesystem::path file_path,int32_t this_id_user)
+void Server::sendFileAllUsers(std::filesystem::path file_path,int this_id_user)
 {
+    std::lock_guard<std::mutex> lokers(loger);
     for(auto& [user_id,user] : users)
     {
         if(user_id == this_id_user) continue;
-        user->sendFile(file_path);
+        user->forming_packet_file(file_path);
     }
 
 }
-void Server::sendTextAllUsers(const std::string& text,int32_t this_id_user)
+void Server::sendTextAllUsers(const std::string text,int this_id_user)
 {
+    std::cout << "отправка людям"<<std::endl;
     for(auto& [user_id,user] : users)
     {
         if(user_id == this_id_user) continue;
-        user->sendText(text);
+        user->forming_packet_text(text);
     }
 }
 
-
-void Server::sendFileIdUser(std::string& path,int32_t id_user)
+void Server::sendFileIdUser(std::filesystem::path path,int id_user)
 {
+    std::lock_guard<std::mutex> lokers(loger);
     auto it = users.find(id_user);
     if(it != users.end())
     {
-        it->second->sendFile(path);
+        it->second->forming_packet_file(path);
     }
 }
-void Server::sendTextIdUser(const std::string& text,int32_t id_user)
+void Server::sendTextIdUser(const std::string text,int id_user)
 {
+    std::lock_guard<std::mutex> lokers(loger);
      auto it = users.find(id_user);
     if(it != users.end())
     {
-        it->second->sendText(text);
+        it->second->forming_packet_text(text);
     }
 }
-
-  
 void Server::DisconectUser(int32_t id)
 {
 
@@ -74,15 +75,12 @@ void Server::DisconectUser(int32_t id)
 
 Server::Server(boost::asio::io_context& io, unsigned short port) : io(io), acceptor(boost::asio::ip::tcp::acceptor(io,boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(),port)))
 {
-    id = 1;
     check_path_file_save();
     
     addUsers();
 }
-
  void Server::check_path_file_save()
     {
-
        std::string filepath;
 
        while(true)
@@ -129,5 +127,6 @@ Server::Server(boost::asio::io_context& io, unsigned short port) : io(io), accep
     }
 void Server::ReadError(std::string&& texterror)
 {
+    std::lock_guard<std::mutex> lokers(loger);
     std::cout << "Внимание "+ texterror << std::endl;
 }

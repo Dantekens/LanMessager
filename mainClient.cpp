@@ -11,10 +11,11 @@ int main()
     std::string path;
     std::string text;
     boost::asio::io_context io;
+    auto guar_io = boost::asio::make_work_guard(io);
     auto client = std::make_shared<Client>(io); 
    
-    client->reverse_read();
-    client->connect(boost::asio::ip::address{boost::asio::ip::make_address("1,2,3")},6004);
+    
+    client->connect(boost::asio::ip::address{boost::asio::ip::make_address("127.0.0.1")},6009);
 
    std::thread thr {[&io](){io.run(); }};
     thr.detach();
@@ -25,7 +26,7 @@ int main()
         std::cout << "Введите ваш логин"<<std::endl;
         std::cin >> login;
         std::cin.ignore(std::numeric_limits<std::streamsize>::max(),'\n');
-        client->send_text(login);
+        client->forming_package_text(login);
     }
 
     while (std::getline(std::cin,text))
@@ -33,11 +34,17 @@ int main()
         if(text.empty()) continue;
         if(text.size() > 6 && text.substr(0,6) == "/file ")
         {
-            client->send_file(text.substr(6));
+            client->forming_package_send_file(text.substr(6));
             continue;
         }
 
-        client->send_text(text);
+        client->forming_package_text(text);
+    }
+    guar_io.reset();
+    io.stop();
+    if(thr.joinable())
+    {
+        thr.join();
     }
     
 

@@ -10,13 +10,16 @@
 #include <mutex>
 
 
-inline std::mutex loger;
+
 
 class Client : std::enable_shared_from_this<Client>
 {
     private:
     
     boost::asio::ip::tcp::socket connectserver;
+    boost::asio::strand<boost::asio::io_context::executor_type> strand_client;
+
+
     uint32_t idsendfile = 0;
     bool seding = false;
 

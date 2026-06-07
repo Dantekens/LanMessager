@@ -4,69 +4,86 @@
 
 
 
-Client::Client(boost::asio::io_context& io): connectserver(io)
+Client::Client(boost::asio::io_context& io): connectserver(io), strand_client(boost::asio::make_strand(io))
 {
         check_path_file_save();
 }
 void  Client::add_packet_in_queue(std::shared_ptr<Packet> packet)
 {
+    boost::asio::post(strand_client,[this,new_packet = std::move(packet)]
+        {
+            std::cout<<"одобавили в очередб пакетов"<< std::endl;
    
-    this->packet.push(std::move(packet));
-    if(seding)
-    {
-        seding = true;
-        send_packet();
-    }
+            this->packet.push(std::move(new_packet));
+            if(!seding)
+            {
+
+                std::cout<<"запускаем отправку "<< std::endl;
+                seding = true;
+                send_packet();
+            }
+
+        });
+        
 }
 void Client::send_packet()
 {
     if(packet.empty())
     {
-        return;
         seding = false;
+        return;
     }
+
     std::shared_ptr<Packet> ready_packet = packet.front();
     packet.pop();
-    auto self = shared_from_this();
+    
 
-    boost::asio::async_write(connectserver,boost::asio::buffer(&ready_packet->data,sizeof(ready_packet->data)),[this,self,ready_packet](const boost::system::error_code& er,std::size_t size)
+    boost::asio::async_write(connectserver,boost::asio::buffer(&ready_packet->data,sizeof(ready_packet->data)),boost::asio::bind_executor(strand_client,[this,ready_packet](const boost::system::error_code& er,std::size_t size)
     {
+        std::cout<<"отправка заголовка"<< std::endl;
         if(er)
         {
             seding = false;
             error("соединение разорвано");
             return;
         }
-
-        boost::asio::async_write(connectserver,boost::asio::buffer(ready_packet->str.data(),ready_packet->str.size()),[this,self,ready_packet](const boost::system::error_code& er,std::size_t size)
+        
+        boost::asio::async_write(connectserver,boost::asio::buffer(ready_packet->str.data(),ready_packet->str.size()),boost::asio::bind_executor(strand_client,[this,ready_packet](const boost::system::error_code& er,std::size_t size)
         {
-            if(er)
-            {
-                seding = false;
-                error("соединение разорвано");
-                 return;
-            }
-
-            if(ready_packet->stream_file && ready_packet->stream_file->is_open()&&!ready_packet->stream_file->eof())
-            {
-                DataSize datafile = ready_packet->data;
-                std::vector<char> buffers(4096);
-                ready_packet->stream_file->read(buffers.data(),4096);
-                std::streamsize realbyte{ready_packet->stream_file->gcount()};
-                    
-                if(realbyte > 0)
+                if(er)
                 {
-                    datafile.data = realbyte;
-                   std::vector<char> real_buffer_file{buffers.begin(),buffers.begin()+realbyte};
-                    auto packet = std::make_shared<Packet>(datafile,real_buffer_file,ready_packet->stream_file);
-
-                     add_packet_in_queue(std::move(packet));
+                    seding = false;
+                    error("соединение разорвано");
+                    return;
                 }
-                else
-                ready_packet->stream_file->close();
-            }
-        });
-    });
+
+                std::cout<<"отправка пакета"<< std::endl;
+
+                if(ready_packet->stream_file && ready_packet->stream_file->is_open()&& !ready_packet->stream_file->eof())
+                {
+                    DataSize datafile = ready_packet->data;
+                    std::vector<char> buffers(4096);
+                    ready_packet->stream_file->read(buffers.data(),4096);
+                    std::streamsize realbyte{ready_packet->stream_file->gcount()};
+                        
+                    if(realbyte > 0)
+                    {
+                        datafile.data = realbyte;
+                        std::vector<char> real_buffer_file{buffers.begin(),buffers.begin()+realbyte};
+                        auto packet = std::make_shared<Packet>(datafile,real_buffer_file,ready_packet->stream_file);
+
+                        add_packet_in_queue(std::move(packet));
+                    }
+                    else
+                    {
+                        ready_packet->stream_file->close();
+                        
+                    }
+                    
+                }
+                send_packet();
+        }));
+    }));
 
 }
 
@@ -136,55 +153,66 @@ void Client::send_packet()
     }
     void Client::forming_package_text(std::string text)
     {
-        DataSize data(Type::Text,0,text.size(),0);
-        auto self = shared_from_this();
-        auto packet = std::make_shared<Packet>(data,text);
-        add_packet_in_queue(std::move(packet));  
+        boost::asio::post(strand_client,[this,text]()
+        {
+            std::cout<<"формирование пакета с  текста"<< std::endl;
+            DataSize data(Type::Text,0,text.size(),0);
+        
+            auto packet = std::make_shared<Packet>(data,text);
+            add_packet_in_queue(std::move(packet)); 
+        });   
     }
     void Client::forming_package_send_file(std::string&& path)
     {
-        std::filesystem::path path_file{path};
-        if(!std::filesystem::exists(path_file) || !std::filesystem::is_regular_file(path_file)) 
+        
+        boost::asio::post(strand_client,[this,path]()
         {
-            error("Фаил не найден укажите верный путь");
-            return;
-        }     
-         
-        int64_t sizefile = static_cast<int64_t>(std::filesystem::file_size(path_file));
-
-        std::string filename = path_file.filename().string(); 
-        DataSize data (Type::FileNow,filename.size(),sizefile,idsendfile);
-        auto self = shared_from_this();
-        auto fileread = std::make_shared<std::ifstream>(path.c_str(),std::ios::binary);
-        auto packet = std::make_shared<Packet>(data,filename);
-
-        add_packet_in_queue(std::move(packet));
-
-
-            DataSize datafile (Type::FileNext,0,0,data.idFile);
+            std::filesystem::path path_file{path};
+            if(!std::filesystem::exists(path_file) || !std::filesystem::is_regular_file(path_file)) 
+            {
+                error("Фаил не найден укажите верный путь");
+                return;
+            }     
             
-                std::vector<char> buffers(4096);
-                fileread->read(buffers.data(),4096);
-                std::streamsize realbyte{fileread->gcount()};
-                    
-                if(realbyte > 0)
-                {
-                    datafile.data = realbyte;
-                   std::vector<char> real_buffer_file{buffers.begin(),buffers.begin()+realbyte};
-                    auto packet = std::make_shared<Packet>(datafile,real_buffer_file,fileread);
+            int64_t sizefile = static_cast<int64_t>(std::filesystem::file_size(path_file));
 
-                     add_packet_in_queue(std::move(packet));
-                }
+            std::string filename = path_file.filename().string(); 
+            DataSize data (Type::FileNow,filename.size(),sizefile,idsendfile);
+            
+            auto fileread = std::make_shared<std::ifstream>(path.c_str(),std::ios::binary);
+            auto packet = std::make_shared<Packet>(data,filename);
+
+            add_packet_in_queue(std::move(packet));
+
+
+                DataSize datafile (Type::FileNext,0,0,data.idFile);
                 
-            
-        ++idsendfile;
+                    std::vector<char> buffers(4096);
+                    fileread->read(buffers.data(),4096);
+                    std::streamsize realbyte{fileread->gcount()};
+                        
+                    if(realbyte > 0)
+                    {
+                        datafile.data = realbyte;
+                    std::vector<char> real_buffer_file{buffers.begin(),buffers.begin()+realbyte};
+                        auto packet = std::make_shared<Packet>(datafile,real_buffer_file,fileread);
+
+                        add_packet_in_queue(std::move(packet));
+                    }
+                    
+                
+            ++idsendfile;
+
+        });
+        
     }
 
     void Client::reverse_read()
     {
-        auto self = shared_from_this();
+        std::cout<< "ожидание  данных" << std::endl;
+        
         auto data = std::make_shared<DataSize>();
-        boost::asio::async_read(connectserver,boost::asio::buffer(data.get(),sizeof(*data)),[this,self,data](const boost::system::error_code& er, std::size_t size)
+        boost::asio::async_read(connectserver,boost::asio::buffer(data.get(),sizeof(*data)),[this,data](const boost::system::error_code& er, std::size_t size)
         {
             if(er)
             {
@@ -194,6 +222,7 @@ void Client::send_packet()
             switch(data->type)
             {
                 case (uint8_t)Type::Text:
+                std::cout<< "ПРИШЕЛ ТЕКСТ" << std::endl;
                     read_text(data->data);
                 break;
 
@@ -204,6 +233,11 @@ void Client::send_packet()
                 case (uint8_t)Type::FileNext:
                     read_file_next(data->data,data->idFile);
                 break;
+                default:
+                std::cout<< "чото НЕ ПОНЯТНОЕ пришло" << std::endl;
+                reverse_read();
+                break;
+                
             }
 
         });
@@ -213,8 +247,8 @@ void Client::send_packet()
     {
         auto namefile = std::make_shared<std::string>();
         namefile->resize(size_name);
-        auto self = shared_from_this();
-        boost::asio::async_read(connectserver,boost::asio::buffer(namefile->data(),size_name),[this,self,namefile,data,id](const boost::system::error_code& er, std::size_t size)
+       
+        boost::asio::async_read(connectserver,boost::asio::buffer(namefile->data(),size_name),boost::asio::bind_executor(strand_client,[this,namefile,data,id](const boost::system::error_code& er, std::size_t size) 
         {
             if(er)
             {
@@ -233,14 +267,14 @@ void Client::send_packet()
                 reverse_read();
                 return;
             }
-            Allfile[id] = info;
+            Allfile[id] = std::move(info);
              reverse_read();
-        });
+        }));
 
     }
     void Client::read_file_next(uint64_t data,uint32_t id)
     {
-        auto  self = shared_from_this();
+        
         auto it = Allfile.find(id);
         if(it == Allfile.end() || !it->second.file->is_open())
         {
@@ -248,7 +282,7 @@ void Client::send_packet()
             return;
         }
         auto buffers = std::make_shared<std::vector<char>>(data);
-        boost::asio::async_read(connectserver,boost::asio::buffer(buffers->data(),data),[this,id,data,self,buffers](const boost::system::error_code &er,std::size_t size)
+        boost::asio::async_read(connectserver,boost::asio::buffer(buffers->data(),data),boost::asio::bind_executor(strand_client,[this,id,data,buffers](const boost::system::error_code &er,std::size_t size)
         {
             if(er)
             {
@@ -272,26 +306,27 @@ void Client::send_packet()
             }
             reverse_read();
 
-        });
+        }));
 
     }
     void Client::read_text(uint64_t data)
     {
+        std::cout<< "ЧТЕНИЕ ТЕКСТА вес " << data << std::endl;
         auto buffertext = std::make_shared<std::vector<char>>(data);
-       
-        auto self = shared_from_this();
 
-        boost::asio::async_read(connectserver,boost::asio::buffer(buffertext->data(),data),[this,self,buffertext](const boost::system::error_code& er, std::size_t size)
+        boost::asio::async_read(connectserver,boost::asio::buffer(buffertext->data(),data),boost::asio::bind_executor(strand_client,[this,buffertext](const boost::system::error_code& er, std::size_t size)
         {
-             if(er)
+            if(er)
             {
                 error("ошибка подключения");
                 return;
             }
+           
 
             std::string text{buffertext->begin(),buffertext->end()};
+             std::cout << "пакет принят от сервера " + text<< std::endl;
             std::cout << text <<std::endl;
             reverse_read();
-        });
+        }));
 
     }
