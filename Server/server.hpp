@@ -43,6 +43,6 @@ class Server
 
     void check_path_file_save();
     Server(boost::asio::io_context& io, unsigned short port);
-    void ReadError(std::string&& texterror);
+    void read_error(std::string&& texterror);
     
 };

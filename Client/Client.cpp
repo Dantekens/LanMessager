@@ -12,13 +12,9 @@ void  Client::add_packet_in_queue(std::shared_ptr<Packet> packet)
 {
     boost::asio::post(strand_client,[this,new_packet = std::move(packet)]
         {
-            std::cout<<"одобавили в очередб пакетов"<< std::endl;
-   
             this->packet.push(std::move(new_packet));
             if(!seding)
             {
-
-                std::cout<<"запускаем отправку "<< std::endl;
                 seding = true;
                 send_packet();
             }
@@ -40,7 +36,6 @@ void Client::send_packet()
 
     boost::asio::async_write(connectserver,boost::asio::buffer(&ready_packet->data,sizeof(ready_packet->data)),boost::asio::bind_executor(strand_client,[this,ready_packet](const boost::system::error_code& er,std::size_t size)
     {
-        std::cout<<"отправка заголовка"<< std::endl;
         if(er)
         {
             seding = false;
@@ -57,7 +52,7 @@ void Client::send_packet()
                     return;
                 }
 
-                std::cout<<"отправка пакета"<< std::endl;
+                
 
                 if(ready_packet->stream_file && ready_packet->stream_file->is_open()&& !ready_packet->stream_file->eof())
                 {
@@ -149,14 +144,13 @@ void Client::send_packet()
     }
     void Client::error(std::string&& er)
     {
-        std::cout << "ВНИМАНИЕ" + er << std::endl;
+        std::cout << "ВНИМАНИЕ " + er << std::endl;
     }
-    void Client::forming_package_text(std::string text)
+    void Client::forming_package_text(std::string text, Type type_text = Type::Text)
     {
-        boost::asio::post(strand_client,[this,text]()
+        boost::asio::post(strand_client,[this,text,type_text]()
         {
-            std::cout<<"формирование пакета с  текста"<< std::endl;
-            DataSize data(Type::Text,0,text.size(),0);
+            DataSize data(type_text,0,text.size(),0);
         
             auto packet = std::make_shared<Packet>(data,text);
             add_packet_in_queue(std::move(packet)); 
@@ -164,7 +158,6 @@ void Client::send_packet()
     }
     void Client::forming_package_send_file(std::string&& path)
     {
-        
         boost::asio::post(strand_client,[this,path]()
         {
             std::filesystem::path path_file{path};
@@ -209,8 +202,6 @@ void Client::send_packet()
 
     void Client::reverse_read()
     {
-        std::cout<< "ожидание  данных" << std::endl;
-        
         auto data = std::make_shared<DataSize>();
         boost::asio::async_read(connectserver,boost::asio::buffer(data.get(),sizeof(*data)),[this,data](const boost::system::error_code& er, std::size_t size)
         {
@@ -222,7 +213,7 @@ void Client::send_packet()
             switch(data->type)
             {
                 case (uint8_t)Type::Text:
-                std::cout<< "ПРИШЕЛ ТЕКСТ" << std::endl;
+                
                     read_text(data->data);
                 break;
 
@@ -234,7 +225,6 @@ void Client::send_packet()
                     read_file_next(data->data,data->idFile);
                 break;
                 default:
-                std::cout<< "чото НЕ ПОНЯТНОЕ пришло" << std::endl;
                 reverse_read();
                 break;
                 
@@ -300,8 +290,6 @@ void Client::send_packet()
                 {
                     find_file.file->close();
                     Allfile.erase(id);
-
-                    std::cout << "фаил успешно принят" << std::endl;
                 }
             }
             reverse_read();
@@ -311,7 +299,6 @@ void Client::send_packet()
     }
     void Client::read_text(uint64_t data)
     {
-        std::cout<< "ЧТЕНИЕ ТЕКСТА вес " << data << std::endl;
         auto buffertext = std::make_shared<std::vector<char>>(data);
 
         boost::asio::async_read(connectserver,boost::asio::buffer(buffertext->data(),data),boost::asio::bind_executor(strand_client,[this,buffertext](const boost::system::error_code& er, std::size_t size)
@@ -324,7 +311,6 @@ void Client::send_packet()
            
 
             std::string text{buffertext->begin(),buffertext->end()};
-             std::cout << "пакет принят от сервера " + text<< std::endl;
             std::cout << text <<std::endl;
             reverse_read();
         }));

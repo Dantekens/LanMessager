@@ -6,6 +6,15 @@
 #include <limits>
 #include <thread>
 
+void  login(std::shared_ptr<Client> client)
+{
+    std::string login;
+    std::cout << "Введите ваш логин"<<std::endl;
+    std::cin >> login;
+    std::cin.ignore(std::numeric_limits<std::streamsize>::max(),'\n');
+    client->forming_package_text(login,Type::Login);
+}
+
 int main()
 {
     std::string path;
@@ -19,15 +28,8 @@ int main()
 
    std::thread thr {[&io](){io.run(); }};
     thr.detach();
-
-
-    {
-        std::string login;
-        std::cout << "Введите ваш логин"<<std::endl;
-        std::cin >> login;
-        std::cin.ignore(std::numeric_limits<std::streamsize>::max(),'\n');
-        client->forming_package_text(login);
-    }
+     
+    login(client);
 
     while (std::getline(std::cin,text))
     {
@@ -37,9 +39,15 @@ int main()
             client->forming_package_send_file(text.substr(6));
             continue;
         }
+        else if(text.size() == 6 && text == "/login")
+        {
+            login(client);
+            continue;
+        }
 
         client->forming_package_text(text);
     }
+    
     guar_io.reset();
     io.stop();
     if(thr.joinable())

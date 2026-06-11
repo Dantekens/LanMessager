@@ -12,10 +12,9 @@ void Session::readMessag()
         
         if(er)
         {
-            server.ReadError("отключился пользователь с id " + id );
+            server.read_error("отключился пользователь с id " + id );
             return;
         }
-        std::cout << "Пакет ghbyzn" <<std::endl;
         switch(info->type)
         {
             case (uint8_t)Type::Text:
@@ -31,7 +30,6 @@ void Session::readMessag()
                     break;
                 case (uint8_t)Type::Login:
                     read_login(info->data);
-                
                 break;
                 
         }
@@ -46,7 +44,7 @@ void Session::read_login(int64_t data)
         if(er)
         {
             server.DisconectUser(id);
-           server.ReadError("отключился пользователь с id " + id );
+           server.read_error("отключился пользователь с id " + id );
             return; 
         }
         if(!login.empty())
@@ -74,13 +72,12 @@ void Session::readText(int64_t data)
         if(er)
         {
             server.DisconectUser(id);
-            server.ReadError("отключился пользователь с id " + id );
+            server.read_error("отключился пользователь с id " + id );
             return; 
         }
     
         std::string text(buffer_text->begin(),buffer_text->end());
         server.sendTextAllUsers(text,id);
-        std::cout << "Пакет принят текст пакета "<< text <<std::endl;
         readMessag();
     });
 }
@@ -94,7 +91,7 @@ void Session::readFileNow(int32_t size_name_file ,int64_t data,int32_t idfile)
         if(er)
         {
             server.DisconectUser(id);
-            server.ReadError("отключился пользователь с id " + id );
+            server.read_error("отключился пользователь с id " + id );
             return; 
         }
         std::filesystem::path full_path_to_file = server.path_to_save_file / *namefile;
@@ -109,8 +106,6 @@ void Session::readFileNow(int32_t size_name_file ,int64_t data,int32_t idfile)
             readMessag();
             return;
         }
-
-         
         files[idfile] = std::move(file);
         readMessag();
     });
@@ -131,7 +126,7 @@ void Session::readFileNext(int64_t data,int32_t idfile)
         if(er)
         {
             server.DisconectUser(id);
-            server.ReadError("отключился пользователь с id " + id );
+            server.read_error("отключился пользователь с id " + id );
             return; 
         }
         auto& file = files[idfile];
@@ -178,7 +173,7 @@ void Session::send_packet()
         {
             sending = false;
             server.DisconectUser(id);
-            server.ReadError("отключился пользователь с id " + id );
+            server.read_error("отключился пользователь с id " + id );
             return; 
         }
         std::cout << "Size text "<< send_packet->data.data << " real size text " << send_packet->str.size() << std::endl; 
@@ -188,10 +183,9 @@ void Session::send_packet()
             {
                 sending = false;
                 server.DisconectUser(id);
-                server.ReadError("отключился пользователь с id " + id );
+                server.read_error("отключился пользователь с id " + id );
                 return; 
             }
-            std::cout<< "пакет ОТПРАВЛЕН"<<std::endl;
             if(send_packet->stream_file && send_packet->stream_file->is_open() && !send_packet->stream_file->eof() )
             {
                 DataSize next_data = send_packet->data;
@@ -205,8 +199,6 @@ void Session::send_packet()
                     std::vector<char> real_buffer(buffer.begin(),buffer.begin() + real_byte_read);
                     auto next_packet = std::make_shared<Packet>(next_data,real_buffer,send_packet->stream_file);
                     add_packet_in_qeueue(std::move(next_packet));
-
-                    std::cout << "Пакет отправлен" <<std::endl;
                 }
                 else
                 send_packet->stream_file->close();
@@ -214,7 +206,6 @@ void Session::send_packet()
             this->send_packet();
         });
     });
-
 }
 
  void Session::start()
@@ -235,7 +226,7 @@ void Session::forming_packet_file(std::filesystem::path path_file)
     {
         if(!std::filesystem::exists(path_file) || !std::filesystem::is_regular_file(path_file))
         {
-            server.ReadError("Пакет не сформирован по причине (путь не верный)");
+            server.read_error("Пакет файлом не сформирован по причине (путь не верный)");
             return;
         }
         uint64_t size_file = static_cast<uint64_t>(std::filesystem::file_size(path_file));
@@ -267,7 +258,6 @@ void Session::forming_packet_text(const std::string text)
 {
         boost::asio::post(strand_server,[this,text, self = shared_from_this()]()
         {
-            std::cout<< "пакет сформирован c text" + text<<std::endl;
             DataSize data(Type::Text,0,text.size(),0);
             auto temp_packet = std::make_shared<Packet>(data,text);
             add_packet_in_qeueue(std::move(temp_packet));

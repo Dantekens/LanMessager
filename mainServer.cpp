@@ -13,6 +13,8 @@ int main()
     boost::asio::io_context io;
    auto io_res =  boost::asio::make_work_guard(io);
     auto server = std::make_shared<Server>(io,6009);
+    
+    std::vector<std::thread> pool_thread(5);
     std::thread  th {[&io](){io.run();}};
     
       

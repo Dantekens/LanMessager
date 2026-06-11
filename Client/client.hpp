@@ -37,7 +37,7 @@ class Client : std::enable_shared_from_this<Client>
     Client(boost::asio::io_context& io);
 
     void connect(boost::asio::ip::address addressServet,unsigned short portserver);
-    void forming_package_text(std::string text);
+    void forming_package_text(std::string text,Type type_text = Type::Text);
     void forming_package_send_file(std::string&& path);
 
     void reverse_read();
