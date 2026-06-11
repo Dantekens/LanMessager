@@ -33,6 +33,7 @@ void Server::sendFileAllUsers(std::filesystem::path file_path,int this_id_user)
 }
 void Server::sendTextAllUsers(const std::string text,int this_id_user)
 {
+    std::lock_guard<std::mutex> lokers(loger);
     std::cout << "отправка людям"<<std::endl;
     for(auto& [user_id,user] : users)
     {
@@ -61,7 +62,7 @@ void Server::sendTextIdUser(const std::string text,int id_user)
 }
 void Server::DisconectUser(int32_t id)
 {
-
+    std::lock_guard<std::mutex> lokers(loger);
     auto it = users.find(id);
     if(it != users.end())
     {
@@ -79,7 +80,7 @@ Server::Server(boost::asio::io_context& io, unsigned short port) : io(io), accep
     
     addUsers();
 }
- void Server::check_path_file_save()
+void Server::check_path_file_save()
     {
        std::string filepath;
 

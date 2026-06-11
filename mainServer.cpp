@@ -5,24 +5,24 @@
 #include <iostream>
 #include <limits>
 #include <thread>
-
+#include "PoolThread/PoolThread.hpp"
 
 int main() 
 {
     std::string command;
     boost::asio::io_context io;
-   auto io_res =  boost::asio::make_work_guard(io);
+
+    auto io_res =  boost::asio::make_work_guard(io);
     auto server = std::make_shared<Server>(io,6009);
-    std::thread  th {[&io](){io.run();}};
+
+    PoolThread pool_thread(io,5);
     
-      
-    
+
     while (std::getline(std::cin,command))
     {
        
     }
     io_res.reset();
-    io.stop();
-     th.join();
+    
     return 0;
 }
