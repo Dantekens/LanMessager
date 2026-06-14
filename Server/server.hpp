@@ -12,13 +12,16 @@
 #include <fstream>
 #include <mutex>
 
-
+namespace Command_Server {
+    class Command;
+}
 
 class Server
 {
     private:
 
     friend class Session;
+    friend class Command_Server::Command;
 
     std::mutex loger;
     std::unordered_map<int32_t,std::shared_ptr<Session>> users;
@@ -38,6 +41,7 @@ class Server
     void sendTextIdUser(const std::string text,int id_user);
 
     void DisconectUser(int32_t id);
+    void DisconectAllUsers();
 
     public:
 

@@ -11,12 +11,17 @@
 #include <algorithm>
 #include <queue>
 
-
+namespace Command_Server {
+    class Command;
+}
 class Server;
 
 class Session : public std::enable_shared_from_this<Session>
 {
     private:
+    
+    friend class Command_Server::Command;
+
     std::unordered_map<int32_t,ActiveFileInfo> files;
     std::queue<std::shared_ptr<Packet>> packet;
 

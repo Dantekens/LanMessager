@@ -72,6 +72,17 @@ void Server::DisconectUser(int32_t id)
         });
     }
 }
+void Server::DisconectAllUsers() 
+{
+    for(auto& client : users)
+    {
+        client.second->CloseSocket();
+        boost::asio::post(io,[this]()
+        {
+            users.clear();
+        });
+    }
+}
 
 Server::Server(boost::asio::io_context& io, unsigned short port) : io(io), acceptor(boost::asio::ip::tcp::acceptor(io,boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(),port)))
 {
